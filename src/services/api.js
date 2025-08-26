@@ -1,16 +1,15 @@
 // src/services/api.js
 import axios from "axios";
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || "http://localhost:4000", 
-});
+const API_URL = "https://zapateria-back.vercel.app"; // tu backend en vercel
 
-export const getCompras = async () => {
+// Función para obtener estadísticas del back
+export const getEstadisticas = async () => {
   try {
-    const response = await api.get("/zapatos/getTodasCompras");
-    return response.data;
+    const res = await axios.get(`${API_URL}/zapatos/estadisticas`);
+    return res.data;
   } catch (error) {
-    console.error("Error al obtener compras:", error);
-    throw error;
+    console.error("Error en getEstadisticas:", error);
+    return null;
   }
 };
