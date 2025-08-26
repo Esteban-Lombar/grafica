@@ -1,29 +1,40 @@
-import { useEffect, useState } from "react";
-import api from "../services/api";
-import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
+// src/components/GraficaVentas.jsx
+import React, { useEffect, useState } from "react";
+import { getCompras } from "../services/api";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 
-export default function GraficaVentas({ idProducto }) {
-  const [data, setData] = useState([]);
+const GraficaVentas = () => {
+  const [compras, setCompras] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Llamar al backend
-    api.get(`/ventas/${idProducto}`)
-      .then(res => setData(res.data))
-      .catch(err => console.error("Error cargando ventas:", err));
-  }, [idProducto]);
+    const fetchData = async () => {
+      try {
+        const data = await getCompras();
+        setCompras(data);
+      } catch (err) {
+        console.error("Error cargando compras:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  if (loading) return <p>Cargando datos...</p>;
+  if (!compras.length) return <p>No hay datos de compras</p>;
 
   return (
-    <div className="w-full h-80 p-4 bg-white rounded-2xl shadow-md">
-      <h2 className="text-xl font-bold mb-4">📊 Ventas del producto</h2>
-      <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data}>
-          <CartesianGrid stroke="#e0e0e0" strokeDasharray="5 5" />
-          <XAxis dataKey="fecha" />
-          <YAxis />
-          <Tooltip />
-          <Line type="monotone" dataKey="cantidad" stroke="#4f46e5" strokeWidth={2} dot={{ r: 5 }} />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+    <ResponsiveContainer width="100%" height={400}>
+      <BarChart data={compras} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+        <CartesianGrid strokeDasharray="3 3" />
+        <XAxis dataKey="nombre" />
+        <YAxis />
+        <Tooltip />
+        <Bar dataKey="cantidad" fill="#8884d8" />
+      </BarChart>
+    </ResponsiveContainer>
   );
-}
+};
+
+export default GraficaVentas;
