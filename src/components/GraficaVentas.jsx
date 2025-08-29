@@ -1,6 +1,6 @@
 // src/components/GraficaVentas.jsx
-import React, { useEffect, useState } from "react";
-import { getEstadisticas } from "../services/api"; // Importamos la función que llama al backend
+import React, { useEffect, useMemo, useState } from "react";
+import { getEstadisticas } from "../services/api"; // ✅ Mantiene tu conexión existente
 import {
   BarChart,
   Bar,
@@ -12,68 +12,191 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
+// --- Utilidades de presentación (no tocan el back) ---
+const useCurrency = (currency = "COP", locale = "es-CO") => {
+  const fmt = useMemo(
+    () =>
+      new Intl.NumberFormat(locale, {
+        style: "currency",
+        currency,
+        maximumFractionDigits: 0,
+      }),
+    [currency, locale]
+  );
+  return (n) => (typeof n === "number" ? fmt.format(n) : n);
+};
+
+const Skeleton = () => (
+  <div className="max-w-6xl mx-auto p-4 md:p-8">
+    <div className="h-8 w-64 bg-gray-200 rounded mb-6 animate-pulse" />
+    <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="bg-white rounded-2xl shadow p-5">
+          <div className="h-4 w-24 bg-gray-200 rounded mb-3 animate-pulse" />
+          <div className="h-8 w-32 bg-gray-200 rounded animate-pulse" />
+        </div>
+      ))}
+    </div>
+    <div className="grid lg:grid-cols-3 gap-6">
+      <div className="bg-white rounded-2xl shadow p-6 lg:col-span-2">
+        <div className="h-5 w-40 bg-gray-200 rounded mb-4 animate-pulse" />
+        <div className="h-[300px] bg-gray-100 rounded animate-pulse" />
+      </div>
+      <div className="bg-white rounded-2xl shadow p-6">
+        <div className="h-5 w-56 bg-gray-200 rounded mb-4 animate-pulse" />
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="h-6 bg-gray-100 rounded animate-pulse" />
+          ))}
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const StatCard = ({ label, value }) => (
+  <div className="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
+    <p className="text-sm text-gray-500 mb-2">{label}</p>
+    <p className="text-2xl font-bold tracking-tight">{value}</p>
+  </div>
+);
+
 const GraficaVentas = () => {
-  // Estados para guardar los datos del backend
   const [estadisticas, setEstadisticas] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // useEffect -> se ejecuta cuando carga el componente
+  const toCOP = useCurrency("COP", "es-CO");
+
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const data = await getEstadisticas(); // Llamada al back
-        setEstadisticas(data); // Guardamos los datos en el estado
+        const data = await getEstadisticas();
+        setEstadisticas(data);
       } catch (error) {
         console.error("Error al traer estadísticas:", error);
       } finally {
         setLoading(false);
       }
     };
-
     fetchData();
   }, []);
 
-  // Mientras carga mostramos mensaje
-  if (loading) return <p>Cargando datos...</p>;
+  if (loading) return <Skeleton />;
+  if (!estadisticas)
+    return (
+      <div className="max-w-3xl mx-auto p-6 text-center">
+        <div className="mx-auto w-24 h-24 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+          <span className="text-3xl">📉</span>
+        </div>
+        <h3 className="text-xl font-semibold mb-1">No hay datos de estadísticas</h3>
+        <p className="text-gray-600">Verifica que existan registros en el backend.</p>
+      </div>
+    );
 
-  // Si no hay datos mostramos aviso
-  if (!estadisticas) return <p>No hay datos de estadísticas</p>;
+  const { totalVentas, productosMasVendidos = [], ventasPorMes = [] } = estadisticas;
+
+  // --- Fallback para asegurar altura del gráfico aunque Tailwind no cargue ---
+  const chartContainerStyle = { height: 320, minHeight: 320 };
 
   return (
-    <div className="p-6">
-      <h2 className="text-2xl font-bold mb-4">📊 Dashboard de Ventas</h2>
+    <div className="min-h-[60vh] bg-gray-50" style={{ backgroundColor: "#f9fafb" }}>
+      <div className="max-w-6xl mx-auto p-4 md:p-8">
+        {/* Encabezado */}
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight">📊 Dashboard de Ventas</h2>
+          <span className="text-xs md:text-sm text-gray-500">
+            Actualizado {new Date().toLocaleDateString("es-CO")}
+          </span>
+        </div>
 
-      {/* Total de ventas */}
-      <div className="mb-6 p-4 bg-gray-100 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold">💰 Total de Ventas</h3>
-        <p className="text-xl">{estadisticas.totalVentas}</p>
-      </div>
+        {/* KPIs */}
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <StatCard label="Total de Ventas" value={toCOP(Number(totalVentas) || 0)} />
+          <StatCard label="Productos listados" value={productosMasVendidos.length} />
+          <StatCard label="Meses en gráfico" value={ventasPorMes.length} />
+          <StatCard
+            label="Promedio mensual"
+            value={toCOP(
+              ventasPorMes.length
+                ? Math.round(
+                    ventasPorMes.reduce((a, b) => a + (Number(b.ventas) || 0), 0) /
+                      ventasPorMes.length
+                  )
+                : 0
+            )}
+          />
+        </div>
 
-      {/* Productos más vendidos */}
-      <div className="mb-6 p-4 bg-gray-100 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold">🔥 Productos Más Vendidos</h3>
-        <ul>
-          {estadisticas.productosMasVendidos.map((prod, i) => (
-            <li key={i}>
-              {prod.producto}: {prod.cantidad} ventas
-            </li>
-          ))}
-        </ul>
-      </div>
+        {/* Contenido principal */}
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Gráfico */}
+          <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-lg font-semibold">📅 Ventas por Mes</h3>
+              <div className="text-xs text-gray-500">{ventasPorMes.length} puntos</div>
+            </div>
+            {/* Fallback inline-style para altura si Tailwind no aplica */}
+            <div className="h-[320px]" style={chartContainerStyle}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={ventasPorMes && ventasPorMes.length ? ventasPorMes : [{ mes: "—", ventas: 0 }]} barCategoryGap={16}>
+                  <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} />
+                  <XAxis dataKey="mes" tickMargin={8} />
+                  <YAxis />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 12, border: "1px solid #eee" }}
+                    formatter={(v, name) =>
+                      name === "ventas" ? [toCOP(Number(v) || 0), "Ventas"] : [v, name]
+                    }
+                  />
+                  <Legend />
+                  <Bar dataKey="ventas" radius={[8, 8, 0, 0]} fill="#8884d8" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
 
-      {/* Ventas por mes - gráfico */}
-      <div className="p-4 bg-gray-100 rounded-lg shadow-md">
-        <h3 className="text-lg font-semibold mb-2">📅 Ventas por Mes</h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={estadisticas.ventasPorMes}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="mes" />
-            <YAxis />
-            <Tooltip />
-            <Legend />
-            <Bar dataKey="ventas" fill="#8884d8" />
-          </BarChart>
-        </ResponsiveContainer>
+          {/* Productos más vendidos */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+            <h3 className="text-lg font-semibold mb-4">🔥 Productos Más Vendidos</h3>
+            {productosMasVendidos.length === 0 ? (
+              <p className="text-gray-600 text-sm">Sin registros</p>
+            ) : (
+              <ul className="space-y-3">
+                {productosMasVendidos.map((prod, i) => (
+                  <li key={`${prod.producto}-${i}`} className="flex items-center gap-3">
+                    <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-sm font-semibold">
+                      {i + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium truncate">{prod.producto}</p>
+                        <span className="text-sm text-gray-600">{prod.cantidad} ventas</span>
+                      </div>
+                      {/* Barra de progreso (solo UI) */}
+                      <div className="mt-2 h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-2 rounded-full bg-gray-900/80"
+                          style={{
+                            width: `${
+                              Math.min(
+                                100,
+                                (Number(prod.cantidad) /
+                                  Math.max(
+                                    1,
+                                    ...productosMasVendidos.map((p) => Number(p.cantidad) || 0)
+                                  )) * 100
+                              ).toFixed(2)
+                            }%`,
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
