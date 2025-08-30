@@ -62,6 +62,15 @@ const StatCard = ({ label, value }) => (
 );
 
 const GraficaVentas = () => {
+  // Util para etiquetar meses del backend ("YYYY-M")
+  function formatMes(raw) {
+    if (!raw) return "";
+    const [y, m] = String(raw).split("-").map(Number);
+    const meses = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
+    const idx = Math.max(1, Math.min(12, m || 1)) - 1;
+    return `${meses[idx]} ${y || ""}`.trim();
+  }
+
   const [estadisticas, setEstadisticas] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -93,7 +102,24 @@ const GraficaVentas = () => {
       </div>
     );
 
-  const { totalVentas, productosMasVendidos = [], ventasPorMes = [] } = estadisticas;
+  const { totalVentas, productosMasVendidos: _rawProductos = [], ventasPorMes: _rawVentasMes = [] } = estadisticas;
+
+  // --- Adaptadores a tu payload real (según capturas) ---
+  const productosAdaptados = Array.isArray(_rawProductos)
+    ? _rawProductos.map((p) => ({
+        producto: String(p?.nombre ?? "—"),
+        cantidad: Number(p?.cantidad) || 0,
+        marca: p?.marca ?? "",
+        img: p?.img ?? "",
+      }))
+    : [];
+
+  const ventasPorMesAdaptadas = Array.isArray(_rawVentasMes)
+    ? _rawVentasMes.map((m) => ({
+        mes: formatMes(m?.mes), // ej. "2025-8" -> "Ago 2025"
+        ventas: Number(m?.totalVentas) || 0,
+      }))
+    : [];
 
   // --- Fallback para asegurar altura del gráfico aunque Tailwind no cargue ---
   const chartContainerStyle = { height: 320, minHeight: 320 };
@@ -112,15 +138,15 @@ const GraficaVentas = () => {
         {/* KPIs */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard label="Total de Ventas" value={toCOP(Number(totalVentas) || 0)} />
-          <StatCard label="Productos listados" value={productosMasVendidos.length} />
-          <StatCard label="Meses en gráfico" value={ventasPorMes.length} />
+          <StatCard label="Productos listados" value={productosAdaptados.length} />
+          <StatCard label="Meses en gráfico" value={ventasPorMesAdaptadas.length} />
           <StatCard
             label="Promedio mensual"
             value={toCOP(
-              ventasPorMes.length
+              ventasPorMesAdaptadas.length
                 ? Math.round(
-                    ventasPorMes.reduce((a, b) => a + (Number(b.ventas) || 0), 0) /
-                      ventasPorMes.length
+                    ventasPorMesAdaptadas.reduce((a, b) => a + (Number(b.ventas) || 0), 0) /
+                      ventasPorMesAdaptadas.length
                   )
                 : 0
             )}
@@ -133,12 +159,11 @@ const GraficaVentas = () => {
           <div className="lg:col-span-2 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold">📅 Ventas por Mes</h3>
-              <div className="text-xs text-gray-500">{ventasPorMes.length} puntos</div>
+              <div className="text-xs text-gray-500">{ventasPorMesAdaptadas.length} puntos</div>
             </div>
-            {/* Fallback inline-style para altura si Tailwind no aplica */}
             <div className="h-[320px]" style={chartContainerStyle}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ventasPorMes && ventasPorMes.length ? ventasPorMes : [{ mes: "—", ventas: 0 }]} barCategoryGap={16}>
+                <BarChart data={ventasPorMesAdaptadas && ventasPorMesAdaptadas.length ? ventasPorMesAdaptadas : [{ mes: "—", ventas: 0 }]} barCategoryGap={16}>
                   <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} />
                   <XAxis dataKey="mes" tickMargin={8} />
                   <YAxis />
@@ -158,11 +183,11 @@ const GraficaVentas = () => {
           {/* Productos más vendidos */}
           <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
             <h3 className="text-lg font-semibold mb-4">🔥 Productos Más Vendidos</h3>
-            {productosMasVendidos.length === 0 ? (
+            {productosAdaptados.length === 0 ? (
               <p className="text-gray-600 text-sm">Sin registros</p>
             ) : (
               <ul className="space-y-3">
-                {productosMasVendidos.map((prod, i) => (
+                {productosAdaptados.map((prod, i) => (
                   <li key={`${prod.producto}-${i}`} className="flex items-center gap-3">
                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-sm font-semibold">
                       {i + 1}
@@ -183,7 +208,7 @@ const GraficaVentas = () => {
                                 (Number(prod.cantidad) /
                                   Math.max(
                                     1,
-                                    ...productosMasVendidos.map((p) => Number(p.cantidad) || 0)
+                                    ...productosAdaptados.map((p) => Number(p.cantidad) || 0)
                                   )) * 100
                               ).toFixed(2)
                             }%`,
