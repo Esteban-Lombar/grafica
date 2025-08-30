@@ -163,10 +163,14 @@ const GraficaVentas = () => {
             </div>
             <div className="h-[320px]" style={chartContainerStyle}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ventasPorMesAdaptadas && ventasPorMesAdaptadas.length ? ventasPorMesAdaptadas : [{ mes: "—", ventas: 0 }]} barCategoryGap={16}>
+                <BarChart
+                  data={ventasPorMesAdaptadas && ventasPorMesAdaptadas.length ? ventasPorMesAdaptadas : [{ mes: "—", ventas: 0 }]}
+                  barCategoryGap={16}
+                  margin={{ top: 20, right: 30, left: 60, bottom: 20 }} // 👈 margen izquierdo ampliado
+                >
                   <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} />
                   <XAxis dataKey="mes" tickMargin={8} />
-                  <YAxis />
+                  <YAxis width={100} tickFormatter={(v) => toCOP(v)} /> {/* 👈 más ancho y formateado */}
                   <Tooltip
                     contentStyle={{ borderRadius: 12, border: "1px solid #eee" }}
                     formatter={(v, name) =>
